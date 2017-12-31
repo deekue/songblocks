@@ -1,114 +1,123 @@
-#!/usr/bin/env python
-from __future__ import print_function
-from soco import SoCo
-from time import sleep
-import time
+#!/usr/bin/python
+
+import ConfigParser
 import nfc
-from _common import get_api
-import tweetpony
+import soco
+import time
 
-# this function gets called when a NFC tag is detected
-def touched(tag):
-    currentHour = time.localtime()[3]
-    isNight = 0
-    if currentHour < daytimeRange[0] or currentHour > daytimeRange[1]: # is it nighttime?
-        isNight = 1
-        
-    tag_uid = str(tag.uid).encode("hex")  # get the UID of the touched tag
+class NFCPollForTagID(object):
+  poll_interval_secs = 0.5
+  poll_last_tag = None
 
-    #Look up the song to play and set the right volume depending on whether it's day or night
-    if tag_uid in songs:
-        print("Tag touched: #" + songs[tag_uid][0] + ", UID: " + tag_uid)
-        print ("  Song: " + songs[tag_uid][1])
-        if isNight:
-            vol = int(round(nightVol * songs[tag_uid][2],0))
-            sonos.volume = vol
-            print ("  Nighttime song volume is " + str(vol))
+  def __init__(self, device_path):
+    self.device_path = device_path
+
+  def poll_for_tag(self):
+    """Poll device at device_path for a tag, return the UID if found, None if not. """
+    with nfc.clf.ContactlessFrontend(self.device_path) as clf:
+        target = clf.sense(nfc.clf.RemoteTarget("106A"))
+        if target is not None:
+            tag = nfc.tag.activate(clf, target)
+            return str(tag.identifier).encode('hex')
         else:
-            vol = int(round(dayVol * songs[tag_uid][2],0))
-            sonos.volume = vol
-            print ("  Daytime song volume is " + str(vol))
-        
-        sonos.play_uri(songs[tag_uid][4])  # play the song
-        print ("  Playing...")
+            return None
 
-        # if the song has a time offset, skip to it.
-        if songs[tag_uid][3]:   
-                sonos.seek(songs[tag_uid][3])
-                print ("  Skipped to " + songs[tag_uid][3])                  
-    else:
-        print ("  No record for tag UID: " + tag_uid)
+  def run(self, tagPresent=None, tagRemoved=None):
+    while True:
+      tag = self.poll_for_tag()
+      if tag is None:
+        print("no tag detected")
+        if self.poll_last_tag is not None:
+          print("  tag %s was present last time" % self.poll_last_tag)
+          self.poll_last_tag = None
+          if tagRemoved is not None:
+            tagRemoved()
+      else:
+        print("tag detected: %s" % tag)
+        if tag == self.poll_last_tag:
+          print("  same tag as last time")
+        else:
+          print("  new tag")
+          self.poll_last_tag = tag
+          if tagPresent is not None:
+            tagPresent(tag)
+    
+      time.sleep(self.poll_interval_secs)
+ 
 
-    # Tweet the song
-    tweet = songs[tag_uid][1] + time.strftime("\n%b %d %Y %H:%M:%S", time.localtime()) 
+class NFCSonosController(object):
+  _player = None
+
+  def __init__(self, configFile="songblocks.ini"):
+    self._configFile = configFile
+    self.config = ConfigParser.SafeConfigParser()
+    self.config.read(configFile)
+
+  def connect(self, player_name=None):
+    if player_name is None:
+      player_name = self.config.get("Config", "player_name")
+    self.player_name = player_name
+    self._player = soco.discovery.by_name(player_name)
+    return self._player
+
+  def sonosPlayUri(self, uri):
+    print "  playing URI %s" % uri
     try:
-        status = twitter_api.update_status(status = tweet)
-    except tweetpony.APIError as err:
-        print ("  Tweet failed: ", err.description)
+      self._player.clear_queue()
+      self._player.add_uri_to_queue(uri)
+      self._player.play_from_queue(index=0)
+    except soco.SoCoException, e:
+      print e
+
+  def sonosStop(self):
+    print "stop playing"
+    try:
+      self._player.stop()
+    except soco.SoCoException, e:
+      print e
+
+  def action_sonos_uri(self, tagConfig):
+    if tagConfig.has_key(tagConfig['uri']):
+      print "  playing %s" % tagConfig['name']
+      self.sonosPlayUri(tagConfig['uri'])
+
+  def action_sonos_playlist(self, tagConfig):
+    print "  playing playlist '%s'" % tagConfig['playlist']
+    try:
+      playlist = self._player.get_sonos_playlist_by_attr('title', tagConfig['playlist'])
+      self.sonosPlayUri(playlist.get_uri())
+    except ValueError:
+      print "  Sonos playlist %s not found" % tagConfig['playlist']
+
+  def tagPresent(self, tag):
+    print "play song for tag %s" % tag
+    tagSection = "tag-%s" % tag
+    if self.config.has_section(tagSection):
+      tagConfig = dict(self.config.items(tagSection))
+      actionName = 'action_%s' % tagConfig['action'].lower().replace(' ', '_')
+      action = getattr(self, actionName, None)
+      if action is not None:
+        action(tagConfig)
+      else:
+        print "  unknown action %s for [%s] in %s" % (actionName, tagSection, self._configFile)
     else:
-        print ("  Tweet sent")
+      print "  [%s] not found in %s" % (tagSection, self._configFile)
 
-    return True
+  def tagRemoved(self):
+    self.sonosStop()
+
+  def run(self, device_path=None):
+    if device_path is None:
+      device_path = self.config.get("Config", "nfc_device_path")
+    poller = NFCPollForTagID(device_path)
+    poller.run(tagPresent=self.tagPresent, tagRemove=self.tagRemoved)
 
 
-# Constants
-dayVol = 50  # default daytime volume
-nightVol = 25 # default nighttime volume
-daytimeRange = [7,17] # daytime is 7:00a to 5:59p
-sonos_ip = '10.0.1.98'
-url = 'x-sonos-http:_t%3a%3a17790141.mp3?sid=11&flags=32'  #default url
-time_offset = ''  #time offset (to skip song intros)
+# main
 
-songs = {
-# block_number, title, vol % (for normalization), time_offset (to skip intros, 'HH:MM:SS'), url
-'04436522c52980' : ['1','Paul Simon: Diamonds on the Soles of Her Shoes',1,time_offset,'x-sonos-http:_t%3a%3a17790141.mp3?sid=11&flags=32'],
-'04926422c52980' : ['2','Nina Simone: To Love Somebody',1,time_offset,'x-sonos-http:_t%3a%3a2995780.mp3?sid=11&flags=32'],
-'04dd3a22c52980' : ['3','Bob Marley: One Cup of Coffee',0.8,time_offset,'x-sonos-http:_t%3a%3a39299573.mp3?sid=11&flags=32'],
-'04b56322c52980' : ['4','Adele: Best for Last',0.8,'00:00:36','x-sonos-http:_t%3a%3a2893061.mp3?sid=11&flags=32'],
-'04e46422c52980' : ['5','Jack Johnson: We are Going to Be Friends',0.8,time_offset,'x-sonos-http:_t%3a%3a2807102%3a%3aa%3a%3a231444.mp3?sid=11&flags=32'],
-'048b6322c52980' : ['6','The Hollies: The Mighty Quinn',0.8,time_offset,'x-sonos-http:_t%3a%3a2568562.mp3?sid=11&flags=32'],
-'04216522c52980' : ['7','Raffi: Baa Baa Black Sheep',1.15,time_offset,'x-sonos-http:_t%3a%3a5425710%3a%3aa%3a%3a441322.mp3?sid=11&flags=32'],
-'04df3a22c52980' : ['8','K\'naan: In the Beginning',0.75,'00:00:13','x-sonos-http:_t%3a%3a5407313.mp3?sid=11&flags=32'],
-'04cb6422c52980' : ['9','Tuck & Patti: Honey Pie',1.3,'00:00:41','x-sonos-http:_t%3a%3a3053744.mp3?sid=11&flags=32'],
-'04436422c52980' : ['10','Miriam Makeba: Pata Pata',0.9,'00:00:09','x-sonos-http:_t%3a%3a1163595.mp3?sid=11&flags=32'],
-'049e6422c52980' : ['11','Yo-Yo Ma & Bobby McFerrin: Flight of the Bumblebee',1.2,time_offset,'x-sonos-http:_t%3a%3a8805968.mp3?sid=11&flags=32'],
-'04536422c52980' : ['12','Desmond De Silva: Babi Achchee',0.8,time_offset,'x-sonos-http:_t%3a%3a43013728.mp3?sid=11&flags=32'],
-}
-
-# Twitter setup
-print("Connecting to Twitter...")
-twitter_api = get_api()
-if twitter_api:
-    print ("Connected to Twitter")
+controller = NFCSonosController()
+if controller.connect() is not None:
+  controller.run()
 else:
-    print ("Twitter connection error")
-print ("")
+  print "Sonos player %s not found" % controller.player_name
 
-
-# Sonos setup
-print("Connecting to Sonos...")
-sonos = SoCo(sonos_ip)
-print ("Connected to Sonos: " + sonos.player_name)
-
-# Use this section to get the URIs of new songs we want to add
-info = sonos.get_current_track_info()
-print("Currently Playing: " + info['title'])
-print("URI: " + info['uri'])
-print("---")
-print("") 
-
-
-print("Setting up reader...")
-reader = nfc.ContactlessFrontend('tty:AMA0:pn53x')
-print(reader)
-print("Ready!")
-print("")
-
-while True:
-    reader.connect(rdwr={'on-connect': touched})
-    print("Tag released")
-    sonos.stop()
-    print ("Sonos stopped")
-    print ("---")
-    print ("")
-    sleep(0.1);
