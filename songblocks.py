@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 import ConfigParser
 import nfc
@@ -110,7 +110,7 @@ class NFCSonosController(object):
     if device_path is None:
       device_path = self.config.get("Config", "nfc_device_path")
     poller = NFCPollForTagID(device_path)
-    poller.run(tagPresent=self.tagPresent, tagRemove=self.tagRemoved)
+    poller.run(tagPresent=self.tagPresent, tagRemoved=self.tagRemoved)
 
 
 # main
