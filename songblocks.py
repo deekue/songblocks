@@ -6,10 +6,10 @@ import soco
 import time
 
 class NFCPollForTagID(object):
-  poll_interval_secs = 0.5
   poll_last_tag = None
 
-  def __init__(self, device_path):
+  def __init__(self, device_path, poll_interval_secs=0.5):
+    self.poll_interval_secs = poll_interval_secs
     self.device_path = device_path
 
   def poll_for_tag(self):
