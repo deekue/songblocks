@@ -9,20 +9,19 @@ that I couldn't get it working.  I added a config file and support for playing
 a Sonos playlist in addition to individual tracks.  I didn't re-add Twitter
 support as I'm not planning on using it.
   
-The code is working but very chatty.  If you kill the process while it's
-talking to the NFC board, the board gets wedged and you have to power cycle it
-(pull the USB cable and replug).
-  
 I used the [FTDI Serial TTL-232 USB Cable](https://www.adafruit.com/product/70)
 initially so I could work on my laptop.  I haven't bothered switching to I2C or
-SPI on the Raspberry Pi, the USB cable works fine :)
+SPI on the Raspberry Pi as the USB cable works fine :)
+However If you kill the process while it's
+talking to the NFC board, the board gets wedged and you have to power cycle it
+(pull the USB cable and replug).
 
 # Installation (WIP)
 1. sudo apt install pip
 1. sudo pip install -r requirements.txt
 1. $EDITOR songblocks.ini
-  1. set the player_name to the Sonos device you want to control
-  1. set the nfc_device_path as per [nfcpy docs](http://nfcpy.readthedocs.io/en/latest/overview.html)
+  * set the player_name to the Sonos device you want to control
+  * set the nfc_device_path as per [nfcpy docs](http://nfcpy.readthedocs.io/en/latest/overview.html)
 1. python songblocks.py
 
 # Hardware
