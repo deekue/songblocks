@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import ConfigParser
+import logging
+import logging.config
 import nfc
 import soco
 import time
@@ -26,18 +28,18 @@ class NFCPollForTagID(object):
     while True:
       tag = self.poll_for_tag()
       if tag is None:
-        print("no tag detected")
+        logging.info("no tag detected")
         if self.poll_last_tag is not None:
-          print("  tag %s was present last time" % self.poll_last_tag)
+          logging.info("  tag %s was present last time" % self.poll_last_tag)
           self.poll_last_tag = None
           if tagRemoved is not None:
             tagRemoved()
       else:
-        print("tag detected: %s" % tag)
+        logging.info("tag detected: %s" % tag)
         if tag == self.poll_last_tag:
-          print("  same tag as last time")
+          logging.info("  same tag as last time")
         else:
-          print("  new tag")
+          logging.info("  new tag")
           self.poll_last_tag = tag
           if tagPresent is not None:
             tagPresent(tag)
@@ -48,7 +50,7 @@ class NFCPollForTagID(object):
 class NFCSonosController(object):
   _player = None
 
-  def __init__(self, configFile="songblocks.ini"):
+  def __init__(self, configFile):
     self._configFile = configFile
     self.config = ConfigParser.SafeConfigParser()
     self.config.read(configFile)
@@ -61,36 +63,36 @@ class NFCSonosController(object):
     return self._player
 
   def sonosPlayUri(self, uri):
-    print "  playing URI %s" % uri
+    logging.info("  playing URI %s" % uri)
     try:
       self._player.clear_queue()
       self._player.add_uri_to_queue(uri)
       self._player.play_from_queue(index=0)
     except soco.SoCoException, e:
-      print e
+      logging.exception(e)
 
   def sonosStop(self):
-    print "stop playing"
+    logging.info("stop playing")
     try:
       self._player.stop()
     except soco.SoCoException, e:
-      print e
+      logging.exception(e)
 
   def action_sonos_uri(self, tagConfig):
     if tagConfig.has_key(tagConfig['uri']):
-      print "  playing %s" % tagConfig['name']
+      logging.info("  playing %s" % tagConfig['name'])
       self.sonosPlayUri(tagConfig['uri'])
 
   def action_sonos_playlist(self, tagConfig):
-    print "  playing playlist '%s'" % tagConfig['playlist']
+    logging.info("  playing playlist '%s'" % tagConfig['playlist'])
     try:
       playlist = self._player.get_sonos_playlist_by_attr('title', tagConfig['playlist'])
       self.sonosPlayUri(playlist.get_uri())
     except ValueError:
-      print "  Sonos playlist %s not found" % tagConfig['playlist']
+      logging.info("  Sonos playlist %s not found" % tagConfig['playlist'])
 
   def tagPresent(self, tag):
-    print "play song for tag %s" % tag
+    logging.info("play song for tag %s" % tag)
     tagSection = "tag-%s" % tag
     if self.config.has_section(tagSection):
       tagConfig = dict(self.config.items(tagSection))
@@ -99,9 +101,9 @@ class NFCSonosController(object):
       if action is not None:
         action(tagConfig)
       else:
-        print "  unknown action %s for [%s] in %s" % (actionName, tagSection, self._configFile)
+        logging.warning("  unknown action %s for [%s] in %s" % (actionName, tagSection, self._configFile))
     else:
-      print "  [%s] not found in %s" % (tagSection, self._configFile)
+      logging.warning("  [%s] not found in %s" % (tagSection, self._configFile))
 
   def tagRemoved(self):
     self.sonosStop()
@@ -114,10 +116,12 @@ class NFCSonosController(object):
 
 
 # main
+if __name__ == "__main__":
+  logging.config.fileConfig('songblocks.ini')
 
-controller = NFCSonosController()
-if controller.connect() is not None:
-  controller.run()
-else:
-  print "Sonos player %s not found" % controller.player_name
+  controller = NFCSonosController(configFile='songblocks.ini')
+  if controller.connect() is not None:
+    controller.run()
+  else:
+    logging.error("Sonos player %s not found" % controller.player_name)
 
