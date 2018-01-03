@@ -20,8 +20,8 @@ talking to the NFC board, the board gets wedged and you have to power cycle it
 1. sudo apt install pip
 1. sudo pip install -r requirements.txt
 1. $EDITOR songblocks.ini
-  * set the player_name to the Sonos device you want to control
-  * set the nfc_device_path as per [nfcpy docs](http://nfcpy.readthedocs.io/en/latest/overview.html)
+   * set the player_name to the Sonos device you want to control
+   * set the nfc_device_path as per [nfcpy docs](http://nfcpy.readthedocs.io/en/latest/overview.html)
 1. python songblocks.py
 
 # Hardware
