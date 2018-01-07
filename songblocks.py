@@ -8,11 +8,16 @@ import time
 # TODO add class/method docstrings
 
 class Poller(object):
+  """ABC for a polling device to provide 'tag' UUIDs."""
+
+  def __init__(self, device_path):
+      pass
+
   def run(self, tagPresent=None, tagRemoved=None):
       pass
 
 
-class NFCPollForTagID(Poller):
+class NFCPoller(Poller):
   poll_last_tag = None
 
   def __init__(self, device_path, poll_interval_secs=0.5):
@@ -52,18 +57,56 @@ class NFCPollForTagID(Poller):
       time.sleep(self.poll_interval_secs)
 
 
-class MockNFCPollForTagID(NFCPollForTagID):
+class MockNFCPoller(NFCPoller):
   def poll_for_tag(self):
     # TODO add a way to trigger mock tags
     return '2b1f76dd'
 
 
 class PlayerController(object):
+
   def action_foobar(self, actionConfig):
       pass
 
   def stop(self):
       pass
+
+
+class ChromecastController(PlayerController):
+  _cast = None
+
+  def __init__(self, cast_name):
+    self.cast_name = cast_name
+    chromecasts = pychromecast.get_chromecasts()
+    self._cast = next(cc for cc in chromecasts if cc.device.friendly_name == cast_name)
+    if self._cast is None:
+        raise "Chromecast %s not found" % cast_name
+    self._mc = self._cast.media_controller
+
+  def playUri(self, uri, content_type):
+    self._mc.play_media(uri, content_type)
+
+  def action_chromecast_uri(self, tagConfig):
+    if actionConfig.has_key('uri'):
+      logging.info("  playing %s" % actionConfig.get('name', actionConfig['uri']))
+      self.playUri(actionConfig['uri'], actionConfig.get('content_type', 'audio/mp3'))
+    else:
+      logging.error("  uri not defined")
+      pass
+
+  def stop(self):
+    self._mc.stop()
+
+
+class MockChromecastController(ChromecastController):
+    def __init__(self, cast_name):
+        self.cast_name = cast_name
+
+    def playUri(self, uri):
+        logging.debug("play URI %s" % uri)
+
+    def stop(self):
+        logging.debug("stop playing")
 
 
 class SonosController(PlayerController):
@@ -158,6 +201,26 @@ class SongBlocks(object):
     self.poller.run(tagPresent=self.tagPresent, tagRemoved=self.tagRemoved)
 
 
+def playerFactory(player_type, player_name, testing=False):
+  player_type = player_type.lower().capitalize()
+  if player_type == "Sonos":
+    if testing:
+      playerClass = MockSonosController(player_name)
+    else:
+      import soco
+      playerClass = SonosController(player_name)
+  elif player_type == "Chromecast":
+    if testing:
+      playerClass = MockChromecastController(player_name)
+    else:
+      import pychromecast
+      playerClass = ChromecastController(player_name)
+  else:
+    raise "Unknown player_type %s" % player_type
+
+  return playerClass
+
+
 # main
 if __name__ == "__main__":
   # TODO add CLI args
@@ -168,16 +231,17 @@ if __name__ == "__main__":
   config.read(configFile)
   device_path = config.get("Config", "nfc_device_path")
   player_name = config.get("Config", "player_name")
+  player_type = config.get("Config", "player_type")
+  testing = config.get('Config', 'testing').lower() 
 
-  if config.get('Config', 'testing').lower() == "true":
+  if testing == "true":
     # TODO do this with test cases instead
-    poller = MockNFCPollForTagID(player_name)
-    player = MockSonosController(device_path)
+    poller = MockNFCPoller(device_path)
   else:
     import nfc
-    import soco
-    poller = NFCPollForTagID(device_path)
-    player = SonosController(player_name)
+    poller = NFCPoller(device_path)
+
+  player = playerFactory(player_type, player_name, testing)
 
   controller = SongBlocks(config, poller, player)
   controller.run()

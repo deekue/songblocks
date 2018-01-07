@@ -5,9 +5,16 @@ A python script to remotely control a Sonos music player with NFC tags.
 Based on [Songblocks](http://shawnrk.github.io/songblocks).
   
 I had to rewrite [shawnrk](http://github.com/shawnrk)'s code as enough had changed in the intervening 3 years
-that I couldn't get it working.  I added a config file and support for playing
-a Sonos playlist in addition to individual tracks.  I didn't re-add Twitter
-support as I'm not planning on using it.
+that I couldn't get it working.
+
+Changes:
+
+* added a config file (songblocks.ini)
+* added support for playing a Sonos playlist in addition to individual tracks
+* added Chromecast support (using pychromecast)
+* removed Twitter support
+* removed time-of-day restrict
+* removed track seek and volume control
   
 I used the [FTDI Serial TTL-232 USB Cable](https://www.adafruit.com/product/70)
 initially so I could work on my laptop.  I haven't bothered switching to I2C or
@@ -26,7 +33,7 @@ talking to the NFC board, the board gets wedged and you have to power cycle it
 
 # Hardware
 ## Reader
-* Raspberry Pi
+* Raspberry Pi (an RPi 1 works fine)
 * [PN532 NFC/RFID controller breakout board](https://www.adafruit.com/product/364)
 * [FTDI Serial TTL-232 USB Cable](https://www.adafruit.com/product/70)
 
