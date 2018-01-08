@@ -1,0 +1,13 @@
+[Unit]
+Description=Songblocks
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/songblocks
+ExecStart=/usr/bin/python /home/pi/songblocks/songblocks.py
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target
