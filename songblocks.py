@@ -77,7 +77,9 @@ class ChromecastController(PlayerController):
 
   def __init__(self, cast_name):
     self.cast_name = cast_name
+    logging.info("searching for local Chromecast devices...")
     chromecasts = pychromecast.get_chromecasts()
+    logging.info("found %s" % chromecasts)
     self._cast = next(cc for cc in chromecasts if cc.device.friendly_name == cast_name)
     if self._cast is None:
         raise "Chromecast %s not found" % cast_name
@@ -86,10 +88,11 @@ class ChromecastController(PlayerController):
   def playUri(self, uri, content_type):
     self._mc.play_media(uri, content_type)
 
-  def action_chromecast_uri(self, tagConfig):
+  def action_chromecast_uri(self, actionConfig):
     if actionConfig.has_key('uri'):
       logging.info("  playing %s" % actionConfig.get('name', actionConfig['uri']))
-      self.playUri(actionConfig['uri'], actionConfig.get('content_type', 'audio/mp3'))
+      content_type = actionConfig.get('content_type', 'audio/mp3')
+      self.playUri(actionConfig['uri'], content_type)
     else:
       logging.error("  uri not defined")
       pass
@@ -102,7 +105,7 @@ class MockChromecastController(ChromecastController):
     def __init__(self, cast_name):
         self.cast_name = cast_name
 
-    def playUri(self, uri):
+    def playUri(self, uri, content_type):
         logging.debug("play URI %s" % uri)
 
     def stop(self):
@@ -114,6 +117,7 @@ class SonosController(PlayerController):
 
   def __init__(self, player_name):
     self.player_name = player_name
+    logging.info("Searching for Sonos device, %s" % player_name)
     self._player = soco.discovery.by_name(player_name)
     if self._player is None:
         raise "Sonos player %s not found" % player_name
@@ -201,26 +205,6 @@ class SongBlocks(object):
     self.poller.run(tagPresent=self.tagPresent, tagRemoved=self.tagRemoved)
 
 
-def playerFactory(player_type, player_name, testing=False):
-  player_type = player_type.lower().capitalize()
-  if player_type == "Sonos":
-    if testing:
-      playerClass = MockSonosController(player_name)
-    else:
-      import soco
-      playerClass = SonosController(player_name)
-  elif player_type == "Chromecast":
-    if testing:
-      playerClass = MockChromecastController(player_name)
-    else:
-      import pychromecast
-      playerClass = ChromecastController(player_name)
-  else:
-    raise "Unknown player_type %s" % player_type
-
-  return playerClass
-
-
 # main
 if __name__ == "__main__":
   # TODO add CLI args
@@ -231,17 +215,35 @@ if __name__ == "__main__":
   config.read(configFile)
   device_path = config.get("Config", "nfc_device_path")
   player_name = config.get("Config", "player_name")
-  player_type = config.get("Config", "player_type")
+  player_type = config.get("Config", "player_type").lower().capitalize()
   testing = config.get('Config', 'testing').lower() 
-
   if testing == "true":
+    testing = True
+  else:
+    testing = False
+
+  if testing:
     # TODO do this with test cases instead
     poller = MockNFCPoller(device_path)
+    if player_type == "Sonos":
+      player = MockSonosController(player_name)
+    elif player_type == "Chromecast":
+      player = MockChromecastController(player_name)
+    else:
+      raise "Unknown player_type %s" % player_type
   else:
     import nfc
     poller = NFCPoller(device_path)
 
-  player = playerFactory(player_type, player_name, testing)
+    if player_type == "Sonos":
+      import soco
+      player = SonosController(player_name)
+    elif player_type == "Chromecast":
+      import pychromecast
+      player = ChromecastController(player_name)
+    else:
+      raise "Unknown player_type %s" % player_type
+
 
   controller = SongBlocks(config, poller, player)
   controller.run()
