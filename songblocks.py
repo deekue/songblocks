@@ -7,6 +7,9 @@ import time
 
 # TODO add class/method docstrings
 
+class SongblocksException(Exception):
+  pass
+
 class Poller(object):
   """ABC for a polling device to provide 'tag' UUIDs."""
 
@@ -82,7 +85,7 @@ class ChromecastController(PlayerController):
     logging.info("found %s" % chromecasts)
     self._cast = next(cc for cc in chromecasts if cc.device.friendly_name == cast_name)
     if self._cast is None:
-        raise "Chromecast %s not found" % cast_name
+      raise SongblocksException("Chromecast %s not found" % cast_name)
     self._mc = self._cast.media_controller
 
   def playUri(self, uri, content_type):
@@ -120,7 +123,7 @@ class SonosController(PlayerController):
     logging.info("Searching for Sonos device, %s" % player_name)
     self._player = soco.discovery.by_name(player_name)
     if self._player is None:
-        raise "Sonos player %s not found" % player_name
+      raise SongblocksException('Sonos player "%s" not found' % player_name)
 
   def playUri(self, uri):
     logging.info("  playing URI %s" % uri)
@@ -194,9 +197,9 @@ class SongBlocks(object):
       if action is not None:
         action(tagConfig)
       else:
-        logging.warning("  unknown action %s for [%s] in config file" % (actionName, tagSection))
+        logging.error("  unknown action %s for [%s] in config file" % (actionName, tagSection))
     else:
-      logging.warning("  [%s] not found in config file" % tagSection)
+      logging.error("  [%s] not found in config file" % tagSection)
 
   def tagRemoved(self):
     self.player.stop()
@@ -230,7 +233,7 @@ if __name__ == "__main__":
     elif player_type == "Chromecast":
       player = MockChromecastController(player_name)
     else:
-      raise "Unknown player_type %s" % player_type
+      raise SongblocksException("Unknown player_type %s" % player_type)
   else:
     import nfc
     poller = NFCPoller(device_path)
@@ -242,7 +245,7 @@ if __name__ == "__main__":
       import pychromecast
       player = ChromecastController(player_name)
     else:
-      raise "Unknown player_type %s" % player_type
+      raise SongblocksException("Unknown player_type %s" % player_type)
 
 
   controller = SongBlocks(config, poller, player)
