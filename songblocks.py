@@ -44,18 +44,18 @@ class NFCPoller(Poller):
     while True:
       tag = self.poll_for_tag()
       if tag is None:
-        logging.info("no tag detected")
+        logging.debug("no tag detected")
         if self.poll_last_tag is not None:
-          logging.info("  tag %s was present last time" % self.poll_last_tag)
+          logging.debug("  tag %s was present last time" % self.poll_last_tag)
           self.poll_last_tag = None
           if tagRemoved is not None:
             tagRemoved()
       else:
-        logging.info("tag detected: %s" % tag)
+        logging.debug("tag detected: %s" % tag)
         if tag == self.poll_last_tag:
-          logging.info("  same tag as last time")
+          logging.debug("  same tag as last time")
         else:
-          logging.info("  new tag")
+          logging.debug("  new tag")
           self.poll_last_tag = tag
           if tagPresent is not None:
             tagPresent(tag)
@@ -77,25 +77,28 @@ class ChromecastController(PlayerController):
 
   def __init__(self, cast_name):
     self.cast_name = cast_name
-    logging.info("searching for local Chromecast devices...")
+    logging.debug("searching for local Chromecast devices...")
     chromecasts = pychromecast.get_chromecasts()
-    logging.info("found %s" % chromecasts)
+    logging.debug("found %s" % chromecasts)
     self._cast = next(cc for cc in chromecasts if cc.device.friendly_name == cast_name)
     if self._cast is None:
       raise SongblocksException("Chromecast %s not found" % cast_name)
     self._mc = self._cast.media_controller
 
   def playUri(self, uri, content_type):
-    self._mc.play_media(uri, content_type)
+    try:
+      self._mc.play_media(uri, content_type)
+    except pychromecast.PyChromecastError:
+      logging.error("pychromecast threw an exception in playUri()",
+              exc_info=True)
 
   def action_chromecast_uri(self, actionConfig):
     if actionConfig.has_key('uri'):
-      logging.info("  playing %s" % actionConfig.get('name', actionConfig['uri']))
+      logging.debug("  playing %s" % actionConfig.get('name', actionConfig['uri']))
       content_type = actionConfig.get('content_type', 'audio/mp3')
       self.playUri(actionConfig['uri'], content_type)
     else:
       logging.error("  uri not defined")
-      pass
 
   def stop(self):
     self._mc.stop()
@@ -106,47 +109,47 @@ class SonosController(PlayerController):
 
   def __init__(self, player_name):
     self.player_name = player_name
-    logging.info("Searching for Sonos device, %s" % player_name)
+    logging.debug("Searching for Sonos device, %s" % player_name)
     self._player = soco.discovery.by_name(player_name)
     if self._player is None:
       raise SongblocksException('Sonos player "%s" not found' % player_name)
 
   def playUri(self, uri):
-    logging.info("  playing URI %s" % uri)
+    logging.debug("  playing URI %s" % uri)
     try:
       self._player.clear_queue()
       self._player.add_uri_to_queue(uri)
       self._player.play_from_queue(index=0)
     except soco.SoCoException, e:
-      logging.exception(e)
+      logging.error("soco threw an exception in playUri()", exc_info=True)
 
   def playPlaylist(self, playlistName):
-    logging.info("  playing playlist '%s'" % playlistName)
+    logging.debug("  playing playlist '%s'" % playlistName)
     try:
       playlist = self._player.get_sonos_playlist_by_attr('title', playlistName)
       self.playUri(playlist.get_uri())
     except ValueError:
       logging.error("  Sonos playlist %s not found" % playlistName)
-    except soco.SoCoException, e:
-      logging.exception(e)
+    except soco.SoCoException:
+      logging.error("soco threw an exception in playPlaylist()", exc_info=True)
 
   def stop(self):
-    logging.info("stop playing")
+    logging.debug("stop playing")
     try:
       self._player.stop()
     except soco.SoCoException, e:
-      logging.exception(e)
+        logging.error("soco threw an exception in stop()", exc_info=True)
 
   def action_sonos_uri(self, actionConfig):
     if actionConfig.has_key('uri'):
-      logging.info("  playing %s" % actionConfig.get('name', actionConfig['uri']))
+      logging.debug("  playing %s" % actionConfig.get('name', actionConfig['uri']))
       self.playUri(actionConfig['uri'])
     else:
       logging.error("  uri not defined")
 
   def action_sonos_playlist(self, actionConfig):
     if actionConfig.has_key('playlist'):
-      logging.info("  playing %s" % actionConfig['playlist'])
+      logging.debug("  playing %s" % actionConfig['playlist'])
       self.playPlaylist(actionConfig['playlist'])
     else:
       logging.error("  playlist not defined")
@@ -160,7 +163,7 @@ class SongBlocks(object):
     self.player = player
 
   def tagPresent(self, tag):
-    logging.info("play song for tag %s" % tag)
+    logging.debug("play song for tag %s" % tag)
     tagSection = "tag-%s" % tag
     if self.config.has_section(tagSection):
       tagConfig = dict(self.config.items(tagSection))
