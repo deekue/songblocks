@@ -3,7 +3,10 @@
 import ConfigParser
 import logging
 import logging.config
+import os
 import time
+import sys
+from optparse import OptionParser
 
 # TODO add class/method docstrings
 
@@ -60,12 +63,6 @@ class NFCPoller(Poller):
       time.sleep(self.poll_interval_secs)
 
 
-class MockNFCPoller(NFCPoller):
-  def poll_for_tag(self):
-    # TODO add a way to trigger mock tags
-    return '2b1f76dd'
-
-
 class PlayerController(object):
 
   def action_foobar(self, actionConfig):
@@ -102,17 +99,6 @@ class ChromecastController(PlayerController):
 
   def stop(self):
     self._mc.stop()
-
-
-class MockChromecastController(ChromecastController):
-    def __init__(self, cast_name):
-        self.cast_name = cast_name
-
-    def playUri(self, uri, content_type):
-        logging.debug("play URI %s" % uri)
-
-    def stop(self):
-        logging.debug("stop playing")
 
 
 class SonosController(PlayerController):
@@ -166,20 +152,6 @@ class SonosController(PlayerController):
       logging.error("  playlist not defined")
 
 
-class MockSonosController(SonosController):
-    def __init__(self, player_name):
-        self.player_name = player_name
-
-    def playUri(self, uri):
-        logging.debug("play URI %s" % uri)
-
-    def playPlaylist(self, playlistName):
-        logging.debug("play playlist %s" % playlistName)
-
-    def stop(self):
-        logging.debug("stop playing")
-
-
 class SongBlocks(object):
 
   def __init__(self, config, poller, player):
@@ -208,46 +180,39 @@ class SongBlocks(object):
     self.poller.run(tagPresent=self.tagPresent, tagRemoved=self.tagRemoved)
 
 
-# main
-if __name__ == "__main__":
-  # TODO add CLI args
-  configFile = 'songblocks.ini'
-  logging.config.fileConfig(configFile)
+def main(argv=None):
+  if argv is None:
+    argv = sys.argv
+
+  parser = OptionParser()
+  parser.add_option("-c", "--config", dest="config_file",
+                    default=os.path.join(os.path.dirname(__file__),
+		      "songblocks.ini"),
+                    help="config file [%default]")
+
+  (options, args) = parser.parse_args(args=argv)
+
+  logging.config.fileConfig(options.config_file)
 
   config = ConfigParser.SafeConfigParser()
-  config.read(configFile)
+  config.read(options.config_file)
   device_path = config.get("Config", "nfc_device_path")
   player_name = config.get("Config", "player_name")
   player_type = config.get("Config", "player_type").lower().capitalize()
-  testing = config.get('Config', 'testing').lower() 
-  if testing == "true":
-    testing = True
+
+  import nfc
+  poller = NFCPoller(device_path)
+  if player_type == "Sonos":
+    import soco
+    player = SonosController(player_name)
+  elif player_type == "Chromecast":
+    import pychromecast
+    player = ChromecastController(player_name)
   else:
-    testing = False
-
-  if testing:
-    # TODO do this with test cases instead
-    poller = MockNFCPoller(device_path)
-    if player_type == "Sonos":
-      player = MockSonosController(player_name)
-    elif player_type == "Chromecast":
-      player = MockChromecastController(player_name)
-    else:
-      raise SongblocksException("Unknown player_type %s" % player_type)
-  else:
-    import nfc
-    poller = NFCPoller(device_path)
-
-    if player_type == "Sonos":
-      import soco
-      player = SonosController(player_name)
-    elif player_type == "Chromecast":
-      import pychromecast
-      player = ChromecastController(player_name)
-    else:
-      raise SongblocksException("Unknown player_type %s" % player_type)
-
+    raise SongblocksException("Unknown player_type %s" % player_type)
 
   controller = SongBlocks(config, poller, player)
   controller.run()
 
+if __name__ == "__main__":
+  sys.exit(main())
