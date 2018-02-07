@@ -33,11 +33,8 @@ class MockSonosController(songblocks.SonosController):
     def __init__(self, player_name):
         self.player_name = player_name
 
-    def playUri(self, uri):
+    def playUri(self, uri, actionConfig):
         logging.debug("play URI %s" % uri)
-
-    def playPlaylist(self, playlistName):
-        logging.debug("play playlist %s" % playlistName)
 
     def stop(self):
         logging.debug("stop playing")
