@@ -7,6 +7,8 @@ import nfc
 
 import abc
 
+logging.getLogger(__name__).addHandler(logging.NullHandler())
+
 class NFCPoller(abc.Poller):
 
   def poll_for_tag(self):

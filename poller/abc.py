@@ -5,6 +5,8 @@
 import logging
 import time
 
+logging.getLogger(__name__).addHandler(logging.NullHandler())
+
 class Poller(object):
   """ABC for a polling device to provide 'tag' UUIDs."""
   poll_last_tag = None

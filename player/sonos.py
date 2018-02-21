@@ -7,6 +7,9 @@ import soco
 
 import abc
 
+logging.getLogger(__name__).addHandler(logging.NullHandler())
+
+
 class SonosControllerException(Exception):
   pass
 

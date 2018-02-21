@@ -6,6 +6,8 @@ import logging
 
 import abc
 
+logging.getLogger(__name__).addHandler(logging.NullHandler())
+
 class MockController(abc.PlayerBase):
 
     def __init__(self, player_name):
