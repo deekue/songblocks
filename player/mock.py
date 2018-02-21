@@ -4,7 +4,9 @@
 
 import logging
 
-class MockController(object):
+import abc
+
+class MockController(abc.PlayerBase):
 
     def __init__(self, player_name):
         pass

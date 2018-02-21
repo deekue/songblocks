@@ -5,10 +5,12 @@
 import logging
 import pychromecast
 
+import abc
+
 class ChromecastControllerException(Exception):
   pass
 
-class ChromecastController(object):
+class ChromecastController(abc.PlayerBase):
   _cast = None
 
   def __init__(self, cast_name):

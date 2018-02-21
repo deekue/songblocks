@@ -5,12 +5,13 @@
 import logging
 import soco
 
+import abc
 
 class SonosControllerException(Exception):
   pass
 
 
-class SonosController(object):
+class SonosController(abc.PlayerBase):
   _player = None
 
   def __init__(self, player_name):
