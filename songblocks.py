@@ -4,7 +4,6 @@ import ConfigParser
 import logging
 import logging.config
 import os
-import time
 import sys
 from optparse import OptionParser
 
@@ -12,62 +11,6 @@ from optparse import OptionParser
 
 class SongblocksException(Exception):
   pass
-
-
-class Poller(object):
-  """ABC for a polling device to provide 'tag' UUIDs."""
-
-  def __init__(self, device_path):
-      pass
-
-  def run(self, tagPresent=None, tagRemoved=None):
-      pass
-
-
-class NFCPoller(Poller):
-  poll_last_tag = None
-
-  def __init__(self, device_path, poll_interval_secs=0.5):
-    self.poll_interval_secs = poll_interval_secs
-    self.device_path = device_path
-
-  def poll_for_tag(self):
-    """Poll device at device_path for a tag, return the UID if found, None if not. """
-    with nfc.clf.ContactlessFrontend(self.device_path) as clf:
-        target = clf.sense(nfc.clf.RemoteTarget("106A"))
-        if target is not None:
-            tag = nfc.tag.activate(clf, target)
-            return str(tag.identifier).encode('hex')
-        else:
-            return None
-
-  def run(self, tagPresent=None, tagRemoved=None):
-    while True:
-      tag = self.poll_for_tag()
-      if tag is None:
-        logging.debug("no tag detected")
-        if self.poll_last_tag is not None:
-          logging.debug("  tag %s was present last time" % self.poll_last_tag)
-          self.poll_last_tag = None
-          if tagRemoved is not None:
-            tagRemoved()
-      else:
-        logging.debug("tag detected: %s" % tag)
-        if tag == self.poll_last_tag:
-          logging.debug("  same tag as last time")
-        else:
-          logging.debug("  new tag")
-          self.poll_last_tag = tag
-          if tagPresent is not None:
-            tagPresent(tag)
-    
-      time.sleep(self.poll_interval_secs)
-
-
-class MockNFCPoller(NFCPoller):
-  def poll_for_tag(self):
-    # TODO add a way to trigger mock tags
-    return '2b1f76dd'
 
 
 class SongBlocks(object):
@@ -98,6 +41,17 @@ class SongBlocks(object):
     self.poller.run(tagPresent=self.tagPresent, tagRemoved=self.tagRemoved)
 
 
+def importPoller(device_path):
+  try:
+    from poller.nfctag import NFCPoller
+    poller = NFCPoller(device_path)
+    logging.debug("chose NFCPoller")
+  except ImportError:
+    from poller.mock import MockPoller
+    poller = MockPoller(device_path)
+    logging.debug("chose MockPoller")
+  return poller
+
 def importPlayer(player_type, player_name):
   try:
     if player_type == "Sonos":
@@ -111,8 +65,8 @@ def importPlayer(player_type, player_name):
   except ImportError:
     from player.mock import MockController
     player = MockController(player_name)
+    logging.debug("chose MockController")
   return player
-
 
 def main(argv=None):
   parser = OptionParser()
@@ -131,12 +85,7 @@ def main(argv=None):
   player_name = config.get("Config", "player_name")
   player_type = config.get("Config", "player_type").lower().capitalize()
 
-  try:
-    import nfc
-    poller = NFCPoller(device_path)
-  except ImportError:
-    poller = MockNFCPoller(device_path)
-  
+  poller = importPoller(device_path)
   player = importPlayer(player_type, player_name)
 
   controller = SongBlocks(config, poller, player)
