@@ -18,12 +18,12 @@ class Poller(object):
   def run(self, tagPresent=None, tagRemoved=None):
     while True:
       tag = self.poll_for_tag()
-      if tag is None:
+      if tag == None:
         logging.debug("no tag detected")
-        if self.poll_last_tag is not None:
+        if self.poll_last_tag != None:
           logging.debug("  tag %s was present last time" % self.poll_last_tag)
           self.poll_last_tag = None
-          if tagRemoved is not None:
+          if tagRemoved != None:
             tagRemoved()
       else:
         logging.debug("tag detected: %s" % tag)
@@ -32,7 +32,7 @@ class Poller(object):
         else:
           logging.debug("  new tag")
           self.poll_last_tag = tag
-          if tagPresent is not None:
+          if tagPresent != None:
             tagPresent(tag)
     
       time.sleep(self.poll_interval_secs)

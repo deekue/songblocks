@@ -21,7 +21,7 @@ class ChromecastController(abc.PlayerBase):
     chromecasts = pychromecast.get_chromecasts()
     logging.debug("found %s" % chromecasts)
     self._cast = next(cc for cc in chromecasts if cc.device.friendly_name == cast_name)
-    if self._cast is None:
+    if self._cast == None:
       raise ChromecastControllerException("Chromecast %s not found" % cast_name)
     self._mc = self._cast.media_controller
 

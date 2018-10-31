@@ -40,7 +40,7 @@ class MockPoller(abc.Poller):
     s = input()
     signal.alarm(0)
 
-    if s is not None:
+    if s != None:
       if s.isdigit():
         result = tags[int(s)]
       elif s.isalpha():

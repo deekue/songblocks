@@ -7,7 +7,7 @@ class PlayerBase(object):
     config file."""
 
     def action_actionname(self, tagConfig):
-        """example action executed when a tag is present.
+        """example action executed when a tag == present.
         eg. action_sonos_uri -> songblocks.ini [tag-238fab] action = Sonos URI
         """
         pass

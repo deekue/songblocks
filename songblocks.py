@@ -27,7 +27,7 @@ class SongBlocks(object):
       tagConfig = dict(self.config.items(tagSection))
       actionName = 'action_%s' % tagConfig['action'].lower().replace(' ', '_')
       action = getattr(self.player, actionName, None)
-      if action is not None:
+      if action != None:
         action(tagConfig)
       else:
         logging.error("  unknown action %s for [%s] in config file" % (actionName, tagSection))

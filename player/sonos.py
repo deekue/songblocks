@@ -21,7 +21,7 @@ class SonosController(abc.PlayerBase):
     self.player_name = player_name
     logging.debug("Searching for Sonos device, %s" % player_name)
     self._player = soco.discovery.by_name(player_name)
-    if self._player is None:
+    if self._player == None:
       raise SonosControllerException('Sonos player "%s" not found' % player_name)
 
   def playUri(self, uri, actionConfig):
