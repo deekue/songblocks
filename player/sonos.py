@@ -55,9 +55,9 @@ class SonosController(abc.PlayerBase):
     if actionConfig.has_key('playlist'):
       logging.debug("  playing playlist %s" % actionConfig['playlist'])
       try:
-        playlist = self._player.get_sonos_playlist_by_attr('title', playlistName)
+        playlist = self._player.get_sonos_playlist_by_attr('title', actionConfig['playlist'])
       except ValueError:
-        logging.error("  Sonos playlist %s not found" % playlistName)
+        logging.error("  Sonos playlist %s not found" % actionConfig['playlist'])
       self.playUri(playlist.get_uri(), actionConfig)
     else:
       logging.error("  playlist not defined")
