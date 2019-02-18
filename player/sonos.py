@@ -16,6 +16,7 @@ class SonosControllerException(Exception):
 
 class SonosController(abc.PlayerBase):
   _player = None
+  _currentAction = None
 
   def __init__(self, player_name):
     self.player_name = player_name
@@ -39,13 +40,23 @@ class SonosController(abc.PlayerBase):
       self._player.play_from_queue(index=0)
     except soco.SoCoException, e:
       logging.error("soco threw an exception in playUri()", exc_info=True)
+    self._currentAction = actionConfig
 
   def stop(self):
     logging.debug("stop playing")
-    try:
-      self._player.stop()
-    except soco.SoCoException, e:
-        logging.error("soco threw an exception in stop()", exc_info=True)
+    if self._currentAction != None:
+      stop_on_remove = self._currentAction.get('stop_on_remove', 'true').lower()
+      if stop_on_remove == 'true':
+        try:
+          self._player.stop()
+        except soco.SoCoException, e:
+          logging.error("soco threw an exception in stop()", exc_info=True)
+        finally:
+          self._currentAction = None
+      else:
+        logging.debug("not stopping")
+    else:
+      logging.error("self._currentAction is None in stop()")
 
   def action_sonos_uri(self, actionConfig):
     if actionConfig.has_key('uri'):
