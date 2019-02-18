@@ -20,7 +20,10 @@ class SonosController(abc.PlayerBase):
   def __init__(self, player_name):
     self.player_name = player_name
     logging.debug("Searching for Sonos device, %s" % player_name)
-    self._player = soco.discovery.by_name(player_name)
+    try:
+      self._player = soco.discovery.by_name(player_name)
+    except soco.SoCoException, e:
+      raise SonosControllerException('Sonos players not found. Error: %s' % player_name)
     if self._player == None:
       raise SonosControllerException('Sonos player "%s" not found' % player_name)
 
