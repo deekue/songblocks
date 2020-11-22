@@ -2,3 +2,4 @@ nfcpy
 soco
 # uncomment for Chromecast support
 #pychromecast
+pyudev

@@ -21,7 +21,7 @@ class SongBlocks(object):
     self.player = player
 
   def tagPresent(self, tag):
-    logging.debug("play song for tag %s" % tag)
+    logging.info("play song for tag %s" % tag)
     tagSection = "tag-%s" % tag
     if self.config.has_section(tagSection):
       tagConfig = dict(self.config.items(tagSection))
@@ -35,6 +35,7 @@ class SongBlocks(object):
       logging.error("  [%s] not found in config file" % tagSection)
 
   def tagRemoved(self):
+    logging.info("tag removed")
     self.player.stop()
 
   def run(self):
@@ -43,9 +44,14 @@ class SongBlocks(object):
 
 def importPoller(poller_type, device_path):
   if poller_type == "Nfctag":
-    from poller.nfctag import NFCPoller
-    poller = NFCPoller(device_path)
-    logging.debug("chose NFCPoller")
+    if 'USB' in device_path:
+      from poller.nfctag import USBNFCPoller
+      poller = USBNFCPoller(device_path)
+      logging.debug("chose USBNFCPoller")
+    else:
+      from poller.nfctag import NFCPoller
+      poller = NFCPoller(device_path)
+      logging.debug("chose NFCPoller")
   elif poller_type == "Mock":
     from poller.mock import MockPoller
     poller = MockPoller(device_path)
