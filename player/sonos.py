@@ -24,7 +24,7 @@ class SonosController(abc.PlayerBase):
     try:
       self._player = soco.discovery.by_name(player_name)
     except soco.SoCoException, e:
-      raise SonosControllerException('Sonos players not found. Error: %s' % player_name)
+      raise SonosControllerException('Sonos player "%s" not found. Error: %s' % (player_name, e))
     if self._player == None:
       raise SonosControllerException('Sonos player "%s" not found' % player_name)
 
